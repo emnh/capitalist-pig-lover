@@ -1,4 +1,5 @@
 const express = require('express');
+const session = require('express-session');
 const app = express();
 const fs = require('fs');
 const port = 8080;
@@ -10,9 +11,15 @@ const bodyParser = require('body-parser');
 
 // Type 2: Persistent datastore with manual loading
 const Datastore = require('nedb');
+// TODO: get homedir from node
 const db = new Datastore({ filename: '/home/emh/capitalist-pig-lover.db' });
 
 const pwd = __dirname;
+
+// TODO: get homedir from node
+const sessionSecret = fs.readFileSync('/home/emh/capitalist-pig-lover.pwd', 'utf8');
+
+const NedbStore = require('nedb-session-store')(session);
 
 db.loadDatabase(function (err) {
   // Removing all documents with the 'match-all' query
@@ -22,6 +29,43 @@ db.loadDatabase(function (err) {
   });
   */
 
+  app.use(session({
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false },
+    store: new NedbStore({
+      filename: '/home/emh/capitalist-pig-lover.session'
+    })
+  }));
+
+  app.use(function (req, res, next) {
+    if (!req.session.user) {
+      db.update(
+        { doc: 'users' },
+        { $inc: { userCount: 1 } },
+        {
+          upsert: true,
+          returnUpdatedDocs: true
+        },
+        function(err, numReplaced, upsert) {
+          console.log("upsert", upsert);
+          const user = 'anon' + upsert.userCount;
+          const doc = {
+            user: user,
+            created: new Date().getTime(),
+          };
+          db.insert(doc, function(err, newDoc) {
+            console.log(newDoc);
+            req.session.user = user;
+            next();
+          });
+        });
+    } else {
+      next();
+    }
+  });
+
   app.use(bodyParser.urlencoded());
 
   app.use(bodyParser.json());
@@ -30,11 +74,14 @@ db.loadDatabase(function (err) {
     response.redirect('/index');
   }); 
 
-  // TODO: remove for security
   app.get('/msgs', (request, response) => {
-    db.find({}).sort({ timestamp: 1 }).exec(function (err, docs) {
+    db.find({ doc: 'msg' }).sort({ timestamp: 1 }).exec(function (err, docs) {
       response.send(JSON.stringify(docs));
     });
+  });
+  
+  app.get('/username', (request, response) => {
+    response.send(request.session.user);
   });
   
   app.post('/postclick', (request, response) => {
@@ -64,7 +111,8 @@ db.loadDatabase(function (err) {
     }
 
     const doc = {
-      user: 'anon',
+      doc: 'msg',
+      user: request.session.user,
       msg: value,
       timestamp: new Date().getTime(),
       choices: {}

@@ -116,15 +116,25 @@ function getMsgs() {
 }
 
 $("body").append(`
-    <h1>Messages</h1>
+    <h1>Introduction</h1>
+    <p>
+    This is a chat forum where you are more likely to see messages from people who make the same choices as you in response to other chat messages.
+    The main idea is that channels or topics are emergent based on a fluid decision stream rather than fixed.
+    </p>
+    <h1>Channel Messages for user "<span id='username'></span>"</h1>
+    <h1>Most Recent Unfiltered Messages</h1>
     <ul id="messages">
     </ul>
     <h1>Input</h1>
     <p>
-      <p>Type a question in the form "A or B?" or free text.</p>
+      <p>Type a question in the form "A or B? " or "This is a context sentence. A or B?" or free text.</p>
       <input id="testinput"type="text"></input>
     </p>
 `);
+
+$.get("/username", function(data) {
+  $("#username").html(data);
+});
 
 $("#testinput").on('keypress', function(e) {
   if (e.which == 13) {
