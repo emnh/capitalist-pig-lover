@@ -15,34 +15,60 @@ const db = new Datastore({ filename: '/home/emh/capitalist-pig-lover.db' });
 const pwd = __dirname;
 
 db.loadDatabase(function (err) {
-  // Callback is optional
-  // Now commands will be executed
+  // Removing all documents with the 'match-all' query
+  /*
+  db.remove({}, { multi: true }, function (err, numRemoved) {
 
-  //app.use(express.static('public'));
-  
+  });
+  */
+
   app.use(bodyParser.urlencoded());
 
   app.use(bodyParser.json());
 
   app.get('/', (request, response) => {
-    /*
-      const data = fs.readFileSync(path.join(pwd, "index.html"), 'utf8');
-      response.send(data);
-    */
-    // response.send('Hello from Express!<input type="text"></input>')
-    
     response.redirect('/index');
   }); 
 
   // TODO: remove for security
-  app.get('/docs', (request, response) => {
-    db.find({}, function (err, docs) {
+  app.get('/msgs', (request, response) => {
+    db.find({}).sort({ timestamp: 1 }).exec(function (err, docs) {
       response.send(JSON.stringify(docs));
     });
   });
+  
+  app.post('/postclick', (request, response) => {
+    const body = request.body;
+    const tag = body.tag;
+    const id = body.msgid;
 
-  app.post('/testinput', (request, response) => {
-    const doc = request.body;
+    console.log(id, tag);
+
+    const upd = {
+      $inc: {}
+    };
+    upd["$inc"]["tags." + tag] = 1;
+    db.update({ _id: id }, upd, function(err, numReplaced) {
+      //console.log("numReplaced", numReplaced);
+      response.send("OK");
+    });
+  });
+
+  app.post('/postmsg', (request, response) => {
+    const body = request.body;
+    const value = body.value;
+    
+    if (value === undefined || value === '') {
+      response.send("Error: empty message");
+      return;
+    }
+
+    const doc = {
+      user: 'anon',
+      msg: value,
+      timestamp: new Date().getTime(),
+      choices: {}
+    };
 
     db.insert(doc, function(err, newDoc) {
       console.log(newDoc);
